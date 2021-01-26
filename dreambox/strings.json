@@ -1,0 +1,45 @@
+{
+  "config": {
+    "flow_title": "Dreambox {name}",
+    "step": {
+      "user": {
+        "description": "Add a new Dreambox",
+        "data": {
+          "name": "[%key:common::config_flow::data::name%]",
+          "host": "[%key:common::config_flow::data::host%]",
+          "port": "[%key:common::config_flow::data::port%]",
+          "ssl": "[%key:common::config_flow::data::ssl%]",
+          "username": "[%key:common::config_flow::data::username%]",
+          "password": "[%key:common::config_flow::data::password%]",
+          "path": "[%key:common::config_flow::data::usb_path%]"
+        }
+      },
+      "confirm": {
+        "description": "Do you want to setup {name}?",
+        "data": {
+          "name": "[%key:common::config_flow::data::name%]",
+          "port": "[%key:common::config_flow::data::port%]",
+          "ssl": "[%key:common::config_flow::data::ssl%]",
+          "username": "[%key:common::config_flow::data::username%]",
+          "password": "[%key:common::config_flow::data::password%]",
+          "path": "[%key:common::config_flow::data::usb_path%]"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]"
+    },
+    "error": {
+        "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+        "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
+      }
+  },
+  "options": {
+    "step": {
+      "dreambox": {
+        "title": "Directories"
+      }
+    }
+  }
+}

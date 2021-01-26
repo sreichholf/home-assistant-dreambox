@@ -1,0 +1,16 @@
+{
+  "domain": "dreambox",
+  "name": "Dreambox",
+  "documentation": "https://www.home-assistant.io/integrations/dreambox",
+  "codeowners": [
+    "@sreichholf"
+  ],
+  "requirements": [
+    "dreamboxapi==1.0.2"
+  ],
+  "ssdp": [
+    {
+      "deviceType": "urn:dreambox-de:device:Dreambox:1"
+    }
+  ]
+}

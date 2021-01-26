@@ -1,0 +1,46 @@
+{
+    "config": {
+      "title": "Dreambox",
+      "flow_title": "Dreambox {name}",
+      "step": {
+        "user": {
+          "description": "Add a new Dreambox",
+          "data": {
+            "name": "Name of the Box",
+            "host": "Hostname",
+            "port": "Network Port",
+            "ssl": "Use https",
+            "username": "Username",
+            "password": "Password",
+            "path": "Picon Path"
+          }
+        },
+        "confirm": {
+            "description": "Do you want to setup {name}?",
+            "data": {
+              "name": "Name of the Box",
+              "port": "Network Port",
+              "ssl": "Use https",
+              "username": "Username",
+              "password": "Password",
+              "path": "Picon Path"
+            }
+          }
+      },
+      "abort": {
+        "already_configured": "This dreambox has already been configured!",
+        "no_devices_found": "No devices found!"
+      },
+      "error": {
+          "invalid_auth": "Authentication failed!",
+          "cannot_connect": "Connection failed!"
+        }
+    },
+    "options": {
+      "step": {
+        "dreambox": {
+          "description": "Directories"
+        }
+      }
+    }
+  }
