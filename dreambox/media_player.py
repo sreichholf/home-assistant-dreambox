@@ -104,12 +104,18 @@ class DreamboxDevice(MediaPlayerEntity):
     @property
     def device_info(self) -> Dict[str, Any]:
         """Return device information about this entity."""
+        if self._dreambox.deviceinfo:
+            model = self._dreambox.deviceinfo.deviceName.rstrip()
+            sw_version = self._dreambox.deviceinfo.enigmaVersion
+        else:
+            model = "n/A"
+            sw_version = "0"
         return {
             "identifiers": {(DOMAIN, self._dreambox.mac)},
             "name": self._name,
             "manufacturer": "Leontech Ltd.",
-            "model": f"Dreambox {self._dreambox.deviceinfo.deviceName}".rstrip(),
-            "sw_version": self._dreambox.deviceinfo.enigmaVersion,
+            "model": f"Dreambox {model}",
+            "sw_version": sw_version,
         }
 
     @property

@@ -8,4 +8,4 @@ A custom home-assistant component for dreambox integration using [python-dreambo
 Copy the `dreambox` folder to `<home-assistant-config-dir>/custom_components/` and restart your home-assistant
 
 ## Configuration
-Autodiscovery is done via SSDP and should work for all somewhat recent dreamboxes (down to 7080 IIRC)
+Autodiscovery is done via SSDP and should work for all somewhat recent dreamboxes. Probably even back to the DM7080.

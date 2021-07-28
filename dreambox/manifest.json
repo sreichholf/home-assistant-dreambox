@@ -7,7 +7,7 @@
     "@sreichholf"
   ],
   "requirements": [
-    "dreamboxapi==1.0.3"
+    "dreamboxapi==1.0.4"
   ],
   "ssdp": [
     {
