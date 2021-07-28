@@ -2,6 +2,7 @@
   "domain": "dreambox",
   "name": "Dreambox",
   "documentation": "https://www.home-assistant.io/integrations/dreambox",
+  "version" : "0.8",
   "codeowners": [
     "@sreichholf"
   ],
