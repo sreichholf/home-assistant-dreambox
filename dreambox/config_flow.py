@@ -6,11 +6,7 @@ from homeassistant.core import callback
 from homeassistant import config_entries
 
 from homeassistant import config_entries
-from homeassistant.components.ssdp import (
-    ATTR_UPNP_MODEL_NAME,
-    ATTR_UPNP_PRESENTATION_URL,
-    ATTR_UPNP_UDN,
-)
+from homeassistant.components import ssdp
 from homeassistant.helpers import config_entry_flow
 
 from homeassistant.const import (
@@ -152,12 +148,12 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_ssdp(self, discovery_info):
         """Handle a flow initialized by ssdp discovery."""
-        url = urlparse(discovery_info[ATTR_UPNP_PRESENTATION_URL])
+        url = urlparse(discovery_info.upnp[ssdp.ATTR_UPNP_PRESENTATION_URL])
         self._host = url.hostname
-        self._name = discovery_info.get(ATTR_UPNP_MODEL_NAME)
+        self._name = discovery_info.upnp.get(ssdp.ATTR_UPNP_MODEL_NAME)
         self._port = url.port or DEFAULT_PORT
 
-        uuid = discovery_info.get(ATTR_UPNP_UDN)
+        uuid = discovery_info.upnp.get(ssdp.ATTR_UPNP_UDN)
         if uuid:
             if uuid.startswith("uuid:"):
                 uuid = uuid[5:]
