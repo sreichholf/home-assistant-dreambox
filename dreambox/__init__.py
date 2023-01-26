@@ -2,6 +2,7 @@
 from voluptuous.schema_builder import Schema
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady
 import homeassistant.helpers.config_validation as cv
 
 from dreamboxapi.api import DreamboxApi
@@ -56,9 +57,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         https=ssl,
         piconpath=piconpath,
     )
-    hass.data[DOMAIN][CONF_CONNECTIONS][entry.entry_id] = api
     await hass.async_add_executor_job(api.get_deviceinfo)
+    if api.deviceinfo is None:
+        raise ConfigEntryNotReady("Failed to obtain device information")
 
+    hass.data[DOMAIN][CONF_CONNECTIONS][entry.entry_id] = api
     for component in PLATFORMS:
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, component)
