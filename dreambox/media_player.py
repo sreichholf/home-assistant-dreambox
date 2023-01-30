@@ -68,7 +68,9 @@ from .const import (
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from homeassistant.components.media_player import PLATFORM_SCHEMA
+from homeassistant.components.media_player import MediaPlayerDeviceClass, PLATFORM_SCHEMA
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -96,54 +98,20 @@ class DreamboxDevice(MediaPlayerEntity):
         self._name = name
         self._bouquet = None
         self._dreambox = device
-
-    @property
-    def unique_id(self):
-        return self._dreambox.mac
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        """Return device information about this entity."""
-        if self._dreambox.deviceinfo:
-            model = self._dreambox.deviceinfo.deviceName.rstrip()
-            sw_version = self._dreambox.deviceinfo.enigmaVersion
-        else:
-            model = "n/A"
-            sw_version = "0"
-        return {
-            "identifiers": {(DOMAIN, self._dreambox.mac)},
-            "name": self._name,
-            "manufacturer": "Leontech Ltd.",
-            "model": f"Dreambox {model}",
-            "sw_version": sw_version,
-        }
-
-    @property
-    def icon(self) -> str:
-        """Return the icon of the device."""
-        return "mdi:set-top-box"
-
-    @property
-    def name(self) -> str:
-        """Return the name of the device."""
-        return self._name
-
-    @property
-    def state(self) -> str:
-        """Return the state of the device."""
-        if self._dreambox.standby:
-            return STATE_OFF
-        return STATE_PLAYING if self._dreambox.current else STATE_ON
-
-    @property
-    def available(self) -> bool:
-        """Return True if the device is available."""
-        return self._dreambox.available
-
-    @property
-    def supported_features(self) -> int:
-        """Flag of media commands that are supported."""
-        return SUPPORTED_DREAMBOX
+        self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
+        self._attr_device_info = DeviceInfo(
+            name=name,
+            manufacturer="Leontech Ltd.",
+            model=f"Dreambox {device.deviceinfo.deviceName.rstrip()}",
+            identifiers={(DOMAIN, device.mac)},
+            connections={(CONNECTION_NETWORK_MAC, device.mac)},
+            sw_version=device.deviceinfo.enigmaVersion,
+        )
+        self._attr_icon = "mdi:set-top-box"
+        self._attr_name = name
+        self._attr_supported_features = SUPPORTED_DREAMBOX
+        self._attr_unique_id = device.mac
+        self._attr_media_content_type = MEDIA_TYPE_TVSHOW
 
     def turn_off(self):
         """Turn off media player."""
@@ -152,45 +120,6 @@ class DreamboxDevice(MediaPlayerEntity):
     def turn_on(self):
         """Turn the media player on."""
         self._dreambox.standby = False
-
-    @property
-    def media_title(self) -> Optional[str]:
-        """Title of current playing media."""
-        return self._dreambox.current.name
-
-    @property
-    def media_series_title(self) -> Optional[str]:
-        """Return the title of current episode of TV show."""
-        return self._dreambox.current.now.title
-
-    @property
-    def media_channel(self) -> Optional[str]:
-        """Channel of current playing media."""
-        return self._dreambox.current.name
-
-    @property
-    def media_content_id(self) -> Optional[str]:
-        """Service Ref of current playing media."""
-        return self._dreambox.current.ref
-
-    @property
-    def media_content_type(self) -> str:
-        """Type of video currently playing."""
-        return MEDIA_TYPE_TVSHOW
-
-    @property
-    def media_duration(self) -> Optional[int]:
-        return self._dreambox.current.now.duration or None
-
-    @property
-    def is_volume_muted(self) -> bool:
-        """Boolean if volume is currently muted."""
-        return self._dreambox.muted
-
-    @property
-    def media_playlist(self) -> Optional[str]:
-        if self._dreambox.bouquet:
-            return self._dreambox.bouquet.name
 
     @property
     def media_image_url(self) -> Optional[str]:
@@ -207,11 +136,6 @@ class DreamboxDevice(MediaPlayerEntity):
     def volume_down(self) -> None:
         """Volume down media player."""
         self._dreambox.volumeDown()
-
-    @property
-    def volume_level(self) -> float:
-        """Volume level of the media player (0..1)."""
-        return float(self._dreambox.volume) / 100.0
 
     def media_stop(self) -> None:
         """Send stop command."""
@@ -337,18 +261,32 @@ class DreamboxDevice(MediaPlayerEntity):
         """Update state of the media_player."""
         self._dreambox.update()
 
-    @property
-    def device_state_attributes(self) -> Dict[str, str]:
-        """Return device specific state attributes.
+        if self._dreambox.standby:
+            self._attr_state = STATE_OFF
+        elif self._dreambox.current:
+            self._attr_state = STATE_PLAYING
+        else:
+            self._attr_state = STATE_ON
 
-        current.now.title: Current program event title.
-        current.now.start:  is in the format '21:00'.
-        current.now.end:    is in the format '21:00'.
-        """
-        if self._dreambox.standby or not self._dreambox.current:
-            return {}
-        return {
-            ATTR_MEDIA_DESCRIPTION: self._dreambox.current.now.title,
-            ATTR_MEDIA_START_TIME: self._dreambox.current.now.start,
-            ATTR_MEDIA_END_TIME: self._dreambox.current.now.end,
-        }
+        self._attr_available = self._dreambox.available
+        self._attr_media_title = self._dreambox.current.name
+        self._attr_media_series_title = self._dreambox.current.now.title
+        self._attr_media_channel = self._dreambox.current.name
+        self._attr_media_content_id = self._dreambox.current.ref
+        self._attr_media_duration = self._dreambox.current.now.duration or None
+        self._attr_is_volume_muted = self._dreambox.muted
+        self._attr_volume_level = float(self._dreambox.volume) / 100.0
+
+        if self._dreambox.bouquet:
+            self._attr_media_playlist = self._dreambox.bouquet.name
+        else:
+            self._attr_media_playlist = None
+
+        if self._attr_state == STATE_PLAYING:
+            self._attr_extra_state_attributes = {
+                ATTR_MEDIA_DESCRIPTION: self._dreambox.current.now.title,
+                ATTR_MEDIA_START_TIME: self._dreambox.current.now.start,
+                ATTR_MEDIA_END_TIME: self._dreambox.current.now.end,
+            }
+        else:
+            self._attr_extra_state_attributes = {}
