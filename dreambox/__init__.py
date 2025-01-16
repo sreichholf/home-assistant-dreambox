@@ -1,9 +1,7 @@
 """The Dreambox integration."""
-from voluptuous.schema_builder import Schema
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
-import homeassistant.helpers.config_validation as cv
 
 from dreamboxapi.api import DreamboxApi
 

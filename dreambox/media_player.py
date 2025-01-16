@@ -1,6 +1,5 @@
 """Support for dreamboxes"""
-from dreamboxapi.api import DreamboxApi
-from typing import Dict, List, Any, Optional
+from typing import Optional
 
 from homeassistant.components.media_player.errors import MediaPlayerException
 
