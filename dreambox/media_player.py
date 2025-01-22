@@ -1,17 +1,14 @@
 """Support for dreamboxes"""
-from dreamboxapi.api import DreamboxApi
-from typing import Dict, List, Any, Optional
-
-from homeassistant.components.media_player.errors import MediaPlayerException
+from typing import Optional
 
 from homeassistant.components.media_player import (
-    MediaPlayerEntity,
-    BrowseMedia,
     BrowseError,
+    BrowseMedia,
+    MediaPlayerEntity,
 )
 from homeassistant.components.media_player.const import (
-    MEDIA_CLASS_DIRECTORY,
     MEDIA_CLASS_CHANNEL,
+    MEDIA_CLASS_DIRECTORY,
     MEDIA_CLASS_PLAYLIST,
     MEDIA_CLASS_VIDEO,
     MEDIA_TYPE_TVSHOW,
@@ -25,11 +22,12 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_STEP,
 )
+from homeassistant.components.media_player.errors import MediaPlayerException
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
-    CONF_PATH,
     CONF_PASSWORD,
+    CONF_PATH,
     CONF_PORT,
     CONF_SSL,
     CONF_USERNAME,
@@ -37,7 +35,6 @@ from homeassistant.const import (
     STATE_ON,
     STATE_PLAYING,
 )
-
 
 SUPPORTED_DREAMBOX = (
     SUPPORT_BROWSE_MEDIA
@@ -51,26 +48,28 @@ SUPPORTED_DREAMBOX = (
     | SUPPORT_VOLUME_STEP
 )
 
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
+from homeassistant.components.media_player import (
+    PLATFORM_SCHEMA,
+    MediaPlayerDeviceClass,
+)
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+from homeassistant.helpers.entity import DeviceInfo
+
 from .const import (
-    DOMAIN,
-    CONF_CONNECTIONS,
     ATTR_MEDIA_DESCRIPTION,
     ATTR_MEDIA_END_TIME,
     ATTR_MEDIA_START_TIME,
+    CONF_CONNECTIONS,
     DEFAULT_NAME,
+    DEFAULT_PASSWORD,
+    DEFAULT_PICON_PATH,
     DEFAULT_PORT,
     DEFAULT_SSL,
     DEFAULT_USERNAME,
-    DEFAULT_PASSWORD,
-    DEFAULT_PICON_PATH,
+    DOMAIN,
 )
-
-
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
-from homeassistant.components.media_player import MediaPlayerDeviceClass, PLATFORM_SCHEMA
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {

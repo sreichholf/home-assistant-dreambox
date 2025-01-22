@@ -1,30 +1,21 @@
 """The Dreambox integration."""
-from voluptuous.schema_builder import Schema
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
-import homeassistant.helpers.config_validation as cv
-
-from dreamboxapi.api import DreamboxApi
-
 import asyncio
 
-from .const import (
-    CONF_CONNECTIONS,
-    DEFAULT_PICON_PATH,
-    DOMAIN,
-    PLATFORMS,
-)
-
+from dreamboxapi.api import DreamboxApi
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_DEVICES,
     CONF_HOST,
-    CONF_PATH,
     CONF_PASSWORD,
+    CONF_PATH,
     CONF_PORT,
     CONF_SSL,
     CONF_USERNAME,
 )
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady
+
+from .const import CONF_CONNECTIONS, DEFAULT_PICON_PATH, DOMAIN, PLATFORMS
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
