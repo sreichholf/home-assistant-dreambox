@@ -8,8 +8,9 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.components.media_player.const import (
     MediaClass,
-    MediaType,
     MediaPlayerEntityFeature,
+    MediaPlayerState,
+    MediaType,
 )
 from homeassistant.components.media_player.errors import MediaPlayerException
 from homeassistant.const import (
@@ -20,9 +21,6 @@ from homeassistant.const import (
     CONF_PORT,
     CONF_SSL,
     CONF_USERNAME,
-    STATE_OFF,
-    STATE_ON,
-    STATE_PLAYING,
 )
 
 SUPPORTED_DREAMBOX = (
@@ -250,11 +248,11 @@ class DreamboxDevice(MediaPlayerEntity):
         self._dreambox.update()
 
         if self._dreambox.standby:
-            self._attr_state = STATE_OFF
+            self._attr_state = MediaPlayerState.OFF
         elif self._dreambox.current:
-            self._attr_state = STATE_PLAYING
+            self._attr_state = MediaPlayerState.PLAYING
         else:
-            self._attr_state = STATE_ON
+            self._attr_state = MediaPlayerState.ON
 
         self._attr_available = self._dreambox.available
         self._attr_media_title = self._dreambox.current.name
@@ -270,7 +268,7 @@ class DreamboxDevice(MediaPlayerEntity):
         else:
             self._attr_media_playlist = None
 
-        if self._attr_state == STATE_PLAYING:
+        if self._attr_state == MediaPlayerState.PLAYING:
             self._attr_extra_state_attributes = {
                 ATTR_MEDIA_DESCRIPTION: self._dreambox.current.now.title,
                 ATTR_MEDIA_START_TIME: self._dreambox.current.now.start,
