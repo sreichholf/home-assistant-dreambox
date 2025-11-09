@@ -7,20 +7,9 @@ from homeassistant.components.media_player import (
     MediaPlayerEntity,
 )
 from homeassistant.components.media_player.const import (
-    MEDIA_CLASS_CHANNEL,
-    MEDIA_CLASS_DIRECTORY,
-    MEDIA_CLASS_PLAYLIST,
-    MEDIA_CLASS_VIDEO,
-    MEDIA_TYPE_TVSHOW,
-    SUPPORT_BROWSE_MEDIA,
-    SUPPORT_PAUSE,
-    SUPPORT_PLAY,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_STOP,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_STEP,
+    MediaClass,
+    MediaType,
+    MediaPlayerEntityFeature,
 )
 from homeassistant.components.media_player.errors import MediaPlayerException
 from homeassistant.const import (
@@ -37,15 +26,15 @@ from homeassistant.const import (
 )
 
 SUPPORTED_DREAMBOX = (
-    SUPPORT_BROWSE_MEDIA
-    | SUPPORT_PAUSE
-    | SUPPORT_PLAY
-    | SUPPORT_PLAY_MEDIA
-    | SUPPORT_STOP
-    | SUPPORT_TURN_OFF
-    | SUPPORT_TURN_ON
-    | SUPPORT_VOLUME_MUTE
-    | SUPPORT_VOLUME_STEP
+    MediaPlayerEntityFeature.BROWSE_MEDIA
+    | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.STOP
+    | MediaPlayerEntityFeature.TURN_OFF
+    | MediaPlayerEntityFeature.TURN_ON
+    | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.VOLUME_STEP
 )
 
 import homeassistant.helpers.config_validation as cv
@@ -110,7 +99,7 @@ class DreamboxDevice(MediaPlayerEntity):
         self._attr_name = name
         self._attr_supported_features = SUPPORTED_DREAMBOX
         self._attr_unique_id = device.mac
-        self._attr_media_content_type = MEDIA_TYPE_TVSHOW
+        self._attr_media_content_type = MediaType.TVSHOW
 
     def turn_off(self):
         """Turn off media player."""
@@ -169,8 +158,8 @@ class DreamboxDevice(MediaPlayerEntity):
         self._bouquet = None
         library_info = {
             "title": "Favorites",
-            "media_class": MEDIA_CLASS_DIRECTORY,
-            "children_media_class": MEDIA_CLASS_PLAYLIST,
+            "media_class": MediaClass.DIRECTORY,
+            "children_media_class": MediaClass.PLAYLIST,
             "media_content_id": "library",
             "media_content_type": "library",
             "can_play": False,
@@ -181,8 +170,8 @@ class DreamboxDevice(MediaPlayerEntity):
         for bouquet in self._dreambox.bouquets:
             bouquet_info = {
                 "title": bouquet.name,
-                "media_class": MEDIA_CLASS_PLAYLIST,
-                "children_media_class": MEDIA_CLASS_CHANNEL,
+                "media_class": MediaClass.PLAYLIST,
+                "children_media_class": MediaClass.CHANNEL,
                 "media_content_id": bouquet.ref,
                 "media_content_type": "bouquet",
                 "can_play": False,
@@ -204,8 +193,8 @@ class DreamboxDevice(MediaPlayerEntity):
         self._bouquet = bouquet
         bouquet_info = {
             "title": bouquet.name,
-            "media_class": MEDIA_CLASS_PLAYLIST,
-            "children_media_class": MEDIA_CLASS_VIDEO,
+            "media_class": MediaClass.PLAYLIST,
+            "children_media_class": MediaClass.VIDEO,
             "media_content_id": bouquet.ref,
             "media_content_type": "bouquet",
             "can_play": False,
@@ -215,9 +204,9 @@ class DreamboxDevice(MediaPlayerEntity):
         for service in bouquet.services:
             service_info = {
                 "title": service.name,
-                "media_class": MEDIA_CLASS_VIDEO,
+                "media_class": MediaClass.VIDEO,
                 "media_content_id": service.ref,
-                "media_content_type": MEDIA_TYPE_TVSHOW,
+                "media_content_type": MediaType.TVSHOW,
                 "can_play": True,
                 "thumbnail": self._dreambox.picon(service),
                 "can_expand": False,
@@ -246,7 +235,7 @@ class DreamboxDevice(MediaPlayerEntity):
         return response
 
     def play_media(self, media_type: str, media_id: str, **kwargs) -> None:
-        if media_type != MEDIA_TYPE_TVSHOW or not self._bouquet:
+        if media_type != MediaType.TVSHOW or not self._bouquet:
             raise MediaPlayerException(
                 f"Media not supported: {media_type} / {media_id}"
             )
