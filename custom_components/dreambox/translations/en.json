@@ -18,6 +18,7 @@
         "confirm": {
             "description": "Do you want to setup {name}?",
             "data": {
+              "host": "Hostname",
               "name": "Name of the Box",
               "port": "Network Port",
               "ssl": "Use https",

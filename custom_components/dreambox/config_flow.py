@@ -4,7 +4,11 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from dreamboxapi.api import AuthenticationFailed, DreamboxApi
 from homeassistant import config_entries
-from homeassistant.components import ssdp
+from homeassistant.helpers.service_info.ssdp import (
+    ATTR_UPNP_MODEL_NAME,
+    ATTR_UPNP_PRESENTATION_URL,
+    ATTR_UPNP_UDN,
+)
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
@@ -114,7 +118,7 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return self.async_abort(reason="already_configured")
 
             result = await self.hass.async_add_executor_job(self._checkConnection)
-            if RESULT_SUCCESS:
+            if result == RESULT_SUCCESS:
                 await self.async_set_unique_id(self._api.mac)
                 self._abort_if_unique_id_configured({CONF_HOST: self._host})
 
@@ -141,12 +145,12 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_ssdp(self, discovery_info):
         """Handle a flow initialized by ssdp discovery."""
-        url = urlparse(discovery_info.upnp[ssdp.ATTR_UPNP_PRESENTATION_URL])
+        url = urlparse(discovery_info.upnp[ATTR_UPNP_PRESENTATION_URL])
         self._host = url.hostname
-        self._name = discovery_info.upnp.get(ssdp.ATTR_UPNP_MODEL_NAME)
+        self._name = discovery_info.upnp.get(ATTR_UPNP_MODEL_NAME)
         self._port = url.port or DEFAULT_PORT
 
-        uuid = discovery_info.upnp.get(ssdp.ATTR_UPNP_UDN)
+        uuid = discovery_info.upnp.get(ATTR_UPNP_UDN)
         if uuid:
             if uuid.startswith("uuid:"):
                 uuid = uuid[5:]
@@ -171,17 +175,24 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             self._name = user_input[CONF_NAME]
+            self._host = user_input[CONF_HOST]
             self._port = user_input[CONF_PORT]
             self._username = user_input[CONF_USERNAME]
             self._password = user_input[CONF_PASSWORD]
             self._ssl = user_input[CONF_SSL]
             self._piconpath = user_input[CONF_PATH]
+
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                if entry.data[CONF_HOST] == self._host:
+                    return self.async_abort(reason="already_configured")
+
             result = await self.hass.async_add_executor_job(self._checkConnection)
             if result == RESULT_SUCCESS:
                 return self._getEntry()
             errors["base"] = result
         data = vol.Schema(
             {
+                vol.Optional(CONF_HOST, default=self._host): cv.string,
                 vol.Optional(CONF_NAME, default=self._name): cv.string,
                 vol.Optional(CONF_PORT, default=self._port): cv.port,
                 vol.Optional(CONF_USERNAME, default=self._username): cv.string,
@@ -201,7 +212,7 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class DreamboxOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
-        self.config_entry = config_entry
+        self._config_entry = config_entry
         self.options = dict(config_entry.options)
 
     async def async_step_init(self, user_input=None):
@@ -211,7 +222,7 @@ class DreamboxOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             self.options.update(user_input)
             return self.async_create_entry(title="", data=self.options)
-        options = self.config_entry.options
+        options = self._config_entry.options
         piconpath = options.get(CONF_PATH, DEFAULT_PICON_PATH)
 
         return self.async_show_form(
