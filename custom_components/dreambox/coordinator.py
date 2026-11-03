@@ -74,6 +74,7 @@ class DreamboxCoordinator(DataUpdateCoordinator[DreamboxData]):
         self._bouquets_updated: float | None = None
         self._bouquet_lock = asyncio.Lock()
         self._bouquet_refresh_task: asyncio.Task[None] | None = None
+        self._shutdown_done = False
 
     @property
     def unique_id(self) -> str:
@@ -221,7 +222,9 @@ class DreamboxCoordinator(DataUpdateCoordinator[DreamboxData]):
             bouquets = list(self.api.bouquets)
             if bouquets or self._bouquets is None:
                 self._bouquets = bouquets
-                self._bouquets_updated = monotonic()
+            else:
+                _LOGGER.warning("Dreambox returned no bouquets; keeping cached list")
+            self._bouquets_updated = monotonic()
             return list(self._bouquets)
 
     @callback
@@ -250,6 +253,9 @@ class DreamboxCoordinator(DataUpdateCoordinator[DreamboxData]):
 
     async def async_shutdown(self) -> None:
         """Stop polling, cancel background work and close the API session."""
+        if self._shutdown_done:
+            return
+        self._shutdown_done = True
         await super().async_shutdown()
         if (
             self._bouquet_refresh_task is not None
