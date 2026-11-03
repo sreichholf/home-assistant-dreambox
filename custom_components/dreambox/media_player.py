@@ -25,13 +25,16 @@ from homeassistant.const import (
 
 SUPPORTED_DREAMBOX = (
     MediaPlayerEntityFeature.BROWSE_MEDIA
+    | MediaPlayerEntityFeature.NEXT_TRACK
     | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.TURN_OFF
     | MediaPlayerEntityFeature.TURN_ON
     | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.VOLUME_SET
     | MediaPlayerEntityFeature.VOLUME_STEP
 )
 
@@ -49,9 +52,11 @@ from .const import (
     ATTR_MEDIA_END_TIME,
     ATTR_MEDIA_START_TIME,
     CONF_CONNECTIONS,
+    CONF_PLAY_PAUSE_TOGGLE,
     DEFAULT_NAME,
     DEFAULT_PASSWORD,
     DEFAULT_PICON_PATH,
+    DEFAULT_PLAY_PAUSE_TOGGLE,
     DEFAULT_PORT,
     DEFAULT_SSL,
     DEFAULT_USERNAME,
@@ -73,17 +78,20 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     device = hass.data[DOMAIN][CONF_CONNECTIONS][config_entry.entry_id]
-    async_add_entities([DreamboxDevice(config_entry.data[CONF_NAME], device)], True)
+    async_add_entities(
+        [DreamboxDevice(config_entry.data[CONF_NAME], device, config_entry)], True
+    )
 
 
 class DreamboxDevice(MediaPlayerEntity):
     """Representation of an Enigma2 box."""
 
-    def __init__(self, name, device):
+    def __init__(self, name, device, config_entry):
         """Initialize the Enigma2 device."""
         self._name = name
         self._bouquet = None
         self._dreambox = device
+        self._config_entry = config_entry
         self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
         self._attr_device_info = DeviceInfo(
             name=name,
@@ -98,6 +106,7 @@ class DreamboxDevice(MediaPlayerEntity):
         self._attr_supported_features = SUPPORTED_DREAMBOX
         self._attr_unique_id = device.mac
         self._attr_media_content_type = MediaType.TVSHOW
+        self._attr_assumed_state = True
 
     def turn_off(self):
         """Turn off media player."""
@@ -123,28 +132,44 @@ class DreamboxDevice(MediaPlayerEntity):
         """Volume down media player."""
         self._dreambox.volumeDown()
 
+    def _send_remote(self, result) -> None:
+        if not result or not getattr(result, "state", False):
+            raise MediaPlayerException("Failed to send remote control command")
+
     def media_stop(self) -> None:
         """Send stop command."""
-        self._dreambox.stop()
+        self._send_remote(self._dreambox.stop())
+
+    @property
+    def _play_pause_toggle(self) -> bool:
+        return self._config_entry.options.get(
+            CONF_PLAY_PAUSE_TOGGLE, DEFAULT_PLAY_PAUSE_TOGGLE
+        )
 
     def media_play_pause(self) -> None:
-        self._dreambox.tooglePlayPause()
+        self._send_remote(self._dreambox.togglePlayPause())
 
     def media_play(self) -> None:
         """Play media."""
-        self._dreambox.tooglePlayPause()
+        if self._play_pause_toggle:
+            self._send_remote(self._dreambox.togglePlayPause())
+        else:
+            self._send_remote(self._dreambox.play())
 
     def media_pause(self) -> None:
         """Pause the media player."""
-        self._dreambox.tooglePlayPause()
+        if self._play_pause_toggle:
+            self._send_remote(self._dreambox.togglePlayPause())
+        else:
+            self._send_remote(self._dreambox.pause())
 
     def media_next_track(self) -> None:
         """Send next track command."""
-        self._dreambox.set_channel_up()
+        self._send_remote(self._dreambox.set_channel_up())
 
     def media_previous_track(self) -> None:
-        """Send next track command."""
-        self._dreambox.set_channel_down()
+        """Send previous track command."""
+        self._send_remote(self._dreambox.set_channel_down())
 
     def mute_volume(self, mute) -> None:
         """Mute or unmute."""
@@ -254,6 +279,7 @@ class DreamboxDevice(MediaPlayerEntity):
         else:
             self._attr_state = MediaPlayerState.ON
 
+        self._attr_assumed_state = self._attr_state != MediaPlayerState.OFF
         self._attr_available = self._dreambox.available
         self._attr_media_title = self._dreambox.current.name
         self._attr_media_series_title = self._dreambox.current.now.title

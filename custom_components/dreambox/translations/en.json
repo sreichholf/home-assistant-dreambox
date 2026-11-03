@@ -40,7 +40,15 @@
     "options": {
       "step": {
         "dreambox": {
-          "description": "Directories"
+          "title": "Dreambox options",
+          "data": {
+            "path": "Picon path",
+            "play_pause_toggle": "Use play/pause toggle for older boxes"
+          },
+          "data_description": {
+            "path": "Path on the Dreambox where the picon files are stored.",
+            "play_pause_toggle": "Older Dreambox models may ignore explicit play and pause commands. Enable this to send the play/pause toggle command instead."
+          }
         }
       }
     }

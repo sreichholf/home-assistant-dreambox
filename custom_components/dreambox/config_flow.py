@@ -21,9 +21,11 @@ from homeassistant.const import (
 from homeassistant.core import callback
 
 from .const import (
+    CONF_PLAY_PAUSE_TOGGLE,
     DEFAULT_NAME,
     DEFAULT_PASSWORD,
     DEFAULT_PICON_PATH,
+    DEFAULT_PLAY_PAUSE_TOGGLE,
     DEFAULT_PORT,
     DEFAULT_SSL,
     DEFAULT_USERNAME,
@@ -224,12 +226,18 @@ class DreamboxOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self.options)
         options = self._config_entry.options
         piconpath = options.get(CONF_PATH, DEFAULT_PICON_PATH)
+        play_pause_toggle = options.get(
+            CONF_PLAY_PAUSE_TOGGLE, DEFAULT_PLAY_PAUSE_TOGGLE
+        )
 
         return self.async_show_form(
             step_id="dreambox",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_PATH, default=piconpath): cv.string,
+                    vol.Optional(
+                        CONF_PLAY_PAUSE_TOGGLE, default=play_pause_toggle
+                    ): cv.boolean,
                 }
             ),
         )

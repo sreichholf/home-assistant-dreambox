@@ -10,12 +10,12 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/sreichholf/home-assistant-dreambox/issues",
   "requirements": [
-    "dreamboxapi==1.0.4"
+    "dreamboxapi==1.1.0"
   ],
   "ssdp": [
     {
       "deviceType": "urn:dreambox-de:device:Dreambox:1"
     }
   ],
-  "version" : "0.9"
+  "version": "0.9.1"
 }
