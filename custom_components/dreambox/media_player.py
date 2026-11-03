@@ -140,8 +140,10 @@ class DreamboxDevice(CoordinatorEntity[DreamboxCoordinator], MediaPlayerEntity):
         self._attr_media_channel = current.name if current is not None else None
         self._attr_media_content_id = current.ref if current is not None else None
         self._attr_media_duration = (now.duration or None) if now is not None else None
-        bouquet = self.coordinator.api.bouquet
-        self._attr_media_playlist = bouquet.name if bouquet is not None else None
+        found = (
+            self.coordinator.find_service(current.ref) if current is not None else None
+        )
+        self._attr_media_playlist = found[1].name if found is not None else None
 
         if state == MediaPlayerState.PLAYING and now is not None:
             self._attr_extra_state_attributes = {
@@ -310,7 +312,8 @@ class DreamboxDevice(CoordinatorEntity[DreamboxCoordinator], MediaPlayerEntity):
 
     async def async_get_media_image(self) -> tuple[bytes | None, str | None]:
         """Return the current channel icon with webinterface authentication."""
-        current = self.coordinator.data.current
+        data = self.coordinator.data
+        current = data.current if data is not None else None
         if current is None:
             return (None, None)
         try:

@@ -178,7 +178,7 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if api.deviceinfo is None:
                     errors["base"] = "cannot_connect"
                 else:
-                    unique_id = api.mac or entry.unique_id
+                    unique_id = entry.unique_id or api.mac
                     if unique_id:
                         await self.async_set_unique_id(unique_id)
                         self._abort_if_unique_id_mismatch()

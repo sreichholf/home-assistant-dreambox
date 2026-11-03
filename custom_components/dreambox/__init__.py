@@ -41,14 +41,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: DreamboxConfigEntry) -> 
         piconpath=entry.options[CONF_PATH],
     )
     coordinator = DreamboxCoordinator(hass, entry, api)
+    setup_ok = False
     try:
         await coordinator.async_config_entry_first_refresh()
-    except Exception:
-        await coordinator.async_shutdown()
-        raise
-
-    entry.runtime_data = coordinator
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.runtime_data = coordinator
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        setup_ok = True
+    finally:
+        if not setup_ok:
+            await coordinator.async_shutdown()
 
     return True
 
@@ -63,5 +64,7 @@ def _async_import_options_from_data_if_missing(hass, entry):
 
 async def async_unload_entry(hass: HomeAssistant, entry: DreamboxConfigEntry) -> bool:
     """Unload a config entry."""
-    await entry.runtime_data.async_shutdown()
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        await entry.runtime_data.async_shutdown()
+    return unload_ok

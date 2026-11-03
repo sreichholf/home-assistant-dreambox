@@ -78,7 +78,10 @@ class DreamboxCoordinator(DataUpdateCoordinator[DreamboxData]):
     @property
     def unique_id(self) -> str:
         """Return the stable identifier for this Dreambox."""
-        return self.api.mac or self.config_entry.unique_id or self.config_entry.entry_id
+        mac = self.api.mac
+        if mac and MAC_ADDRESS.match(mac) and mac != "00:00:00:00:00:00":
+            return mac
+        return self.config_entry.unique_id or self.config_entry.entry_id
 
     def _normalized_mac(self) -> str:
         """Return the normalized MAC address, if the box reports a valid one."""
@@ -246,7 +249,8 @@ class DreamboxCoordinator(DataUpdateCoordinator[DreamboxData]):
             self._bouquet_refresh_task = None
 
     async def async_shutdown(self) -> None:
-        """Cancel background work and close the API session."""
+        """Stop polling, cancel background work and close the API session."""
+        await super().async_shutdown()
         if (
             self._bouquet_refresh_task is not None
             and not self._bouquet_refresh_task.done()
