@@ -3,12 +3,8 @@ from urllib.parse import urlparse
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from dreamboxapi.api import AuthenticationFailed, DreamboxApi
+from dreamboxapi.exceptions import DreamboxError
 from homeassistant import config_entries
-from homeassistant.helpers.service_info.ssdp import (
-    ATTR_UPNP_MODEL_NAME,
-    ATTR_UPNP_PRESENTATION_URL,
-    ATTR_UPNP_UDN,
-)
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
@@ -19,6 +15,11 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
+from homeassistant.helpers.service_info.ssdp import (
+    ATTR_UPNP_MODEL_NAME,
+    ATTR_UPNP_PRESENTATION_URL,
+    ATTR_UPNP_UDN,
+)
 
 from .const import (
     CONF_PLAY_PAUSE_TOGGLE,
@@ -84,7 +85,11 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._api.get_deviceinfo()
         except AuthenticationFailed:
             return RESULT_INVALID_AUTH
-        if not self._api.available:
+        except DreamboxError:
+            return RESULT_CANNOT_CONNECT
+        finally:
+            self._api.close()
+        if self._api.deviceinfo is None:
             return RESULT_CANNOT_CONNECT
         return RESULT_SUCCESS
 
@@ -143,6 +148,63 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=DATA_SCHEMA_USER,
+        )
+
+    async def async_step_reauth(self, entry_data):
+        """Handle a reauthentication request."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Ask for new credentials and update the existing entry."""
+        errors = {}
+        entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            api = DreamboxApi(
+                host=entry.data[CONF_HOST],
+                port=entry.data[CONF_PORT],
+                user=user_input[CONF_USERNAME],
+                password=user_input[CONF_PASSWORD],
+                https=entry.data[CONF_SSL],
+                piconpath=entry.options.get(CONF_PATH, DEFAULT_PICON_PATH),
+            )
+            try:
+                await self.hass.async_add_executor_job(api.get_deviceinfo)
+            except AuthenticationFailed:
+                errors["base"] = "invalid_auth"
+            except DreamboxError:
+                errors["base"] = "cannot_connect"
+            else:
+                if api.deviceinfo is None:
+                    errors["base"] = "cannot_connect"
+                else:
+                    unique_id = api.mac or entry.unique_id
+                    if unique_id:
+                        await self.async_set_unique_id(unique_id)
+                        self._abort_if_unique_id_mismatch()
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates={
+                            CONF_USERNAME: user_input[CONF_USERNAME],
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        },
+                    )
+            finally:
+                await self.hass.async_add_executor_job(api.close)
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_USERNAME, default=entry.data[CONF_USERNAME]
+                    ): cv.string,
+                    vol.Required(
+                        CONF_PASSWORD, default=entry.data[CONF_PASSWORD]
+                    ): cv.string,
+                }
+            ),
+            errors=errors,
         )
 
     async def async_step_ssdp(self, discovery_info):

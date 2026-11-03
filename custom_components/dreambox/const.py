@@ -2,7 +2,6 @@ ATTR_MEDIA_DESCRIPTION = "media_description"
 ATTR_MEDIA_END_TIME = "media_end_time"
 ATTR_MEDIA_START_TIME = "media_start_time"
 
-CONF_CONNECTIONS = "connections"
 CONF_PLAY_PAUSE_TOGGLE = "play_pause_toggle"
 
 DEFAULT_NAME = "Dreambox"

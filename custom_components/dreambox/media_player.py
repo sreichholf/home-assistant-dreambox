@@ -1,9 +1,17 @@
-"""Support for dreamboxes"""
-from typing import Optional
+"""Support for Dreamboxes."""
 
+from collections.abc import Callable
+from typing import Any
+
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
+from dreamboxapi.data import ServiceList
+from dreamboxapi.exceptions import DreamboxError
 from homeassistant.components.media_player import (
+    PLATFORM_SCHEMA,
     BrowseError,
     BrowseMedia,
+    MediaPlayerDeviceClass,
     MediaPlayerEntity,
 )
 from homeassistant.components.media_player.const import (
@@ -22,6 +30,26 @@ from homeassistant.const import (
     CONF_SSL,
     CONF_USERNAME,
 )
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import (
+    ATTR_MEDIA_DESCRIPTION,
+    ATTR_MEDIA_END_TIME,
+    ATTR_MEDIA_START_TIME,
+    CONF_PLAY_PAUSE_TOGGLE,
+    DEFAULT_NAME,
+    DEFAULT_PASSWORD,
+    DEFAULT_PICON_PATH,
+    DEFAULT_PLAY_PAUSE_TOGGLE,
+    DEFAULT_PORT,
+    DEFAULT_SSL,
+    DEFAULT_USERNAME,
+)
+from .coordinator import DreamboxConfigEntry, DreamboxCoordinator
+
+PARALLEL_UPDATES = 1
 
 SUPPORTED_DREAMBOX = (
     MediaPlayerEntityFeature.BROWSE_MEDIA
@@ -38,31 +66,6 @@ SUPPORTED_DREAMBOX = (
     | MediaPlayerEntityFeature.VOLUME_STEP
 )
 
-import homeassistant.helpers.config_validation as cv
-import voluptuous as vol
-from homeassistant.components.media_player import (
-    PLATFORM_SCHEMA,
-    MediaPlayerDeviceClass,
-)
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.helpers.entity import DeviceInfo
-
-from .const import (
-    ATTR_MEDIA_DESCRIPTION,
-    ATTR_MEDIA_END_TIME,
-    ATTR_MEDIA_START_TIME,
-    CONF_CONNECTIONS,
-    CONF_PLAY_PAUSE_TOGGLE,
-    DEFAULT_NAME,
-    DEFAULT_PASSWORD,
-    DEFAULT_PICON_PATH,
-    DEFAULT_PLAY_PAUSE_TOGGLE,
-    DEFAULT_PORT,
-    DEFAULT_SSL,
-    DEFAULT_USERNAME,
-    DOMAIN,
-)
-
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_HOST): cv.string,
@@ -76,69 +79,114 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    device = hass.data[DOMAIN][CONF_CONNECTIONS][config_entry.entry_id]
-    async_add_entities(
-        [DreamboxDevice(config_entry.data[CONF_NAME], device, config_entry)], True
-    )
+async def async_setup_entry(
+    hass, config_entry: DreamboxConfigEntry, async_add_entities
+) -> None:
+    """Set up the Dreambox media player."""
+    async_add_entities([DreamboxDevice(config_entry.runtime_data, config_entry)])
 
 
-class DreamboxDevice(MediaPlayerEntity):
+class DreamboxDevice(CoordinatorEntity[DreamboxCoordinator], MediaPlayerEntity):
     """Representation of an Enigma2 box."""
 
-    def __init__(self, name, device, config_entry):
+    def __init__(
+        self, coordinator: DreamboxCoordinator, config_entry: DreamboxConfigEntry
+    ) -> None:
         """Initialize the Enigma2 device."""
-        self._name = name
-        self._bouquet = None
-        self._dreambox = device
+        super().__init__(coordinator)
         self._config_entry = config_entry
-        self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
-        self._attr_device_info = DeviceInfo(
-            name=name,
-            manufacturer="Leontech Ltd.",
-            model=f"Dreambox {device.deviceinfo.deviceName.rstrip()}",
-            identifiers={(DOMAIN, device.mac)},
-            connections={(CONNECTION_NETWORK_MAC, device.mac)},
-            sw_version=device.deviceinfo.enigmaVersion,
-        )
-        self._attr_icon = "mdi:set-top-box"
-        self._attr_name = name
-        self._attr_supported_features = SUPPORTED_DREAMBOX
-        self._attr_unique_id = device.mac
-        self._attr_media_content_type = MediaType.TVSHOW
         self._attr_assumed_state = True
+        self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
+        self._attr_device_info = coordinator.device_info
+        self._attr_icon = "mdi:set-top-box"
+        self._attr_media_content_type = MediaType.TVSHOW
+        self._attr_name = config_entry.data.get(CONF_NAME, config_entry.title)
+        self._attr_supported_features = SUPPORTED_DREAMBOX
+        self._attr_unique_id = coordinator.unique_id
+        self._update_attrs()
 
-    def turn_off(self):
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_attrs()
+        super()._handle_coordinator_update()
+
+    def _update_attrs(self) -> None:
+        """Copy the coordinator snapshot onto the media player attributes."""
+        data = self.coordinator.data
+        if data is None:
+            return
+
+        current = data.current
+        now = current.now if current is not None else None
+
+        if data.in_standby:
+            state = MediaPlayerState.OFF
+        elif current is not None:
+            state = MediaPlayerState.PLAYING
+        else:
+            state = MediaPlayerState.ON
+
+        self._attr_state = state
+        self._attr_assumed_state = state != MediaPlayerState.OFF
+        self._attr_is_volume_muted = data.muted
+        self._attr_volume_level = data.volume / 100.0
+        self._attr_media_image_url = (
+            self.coordinator.api.picon(current) if current is not None else None
+        )
+        self._attr_media_title = current.name if current is not None else None
+        self._attr_media_series_title = now.title if now is not None else None
+        self._attr_media_channel = current.name if current is not None else None
+        self._attr_media_content_id = current.ref if current is not None else None
+        self._attr_media_duration = (now.duration or None) if now is not None else None
+        bouquet = self.coordinator.api.bouquet
+        self._attr_media_playlist = bouquet.name if bouquet is not None else None
+
+        if state == MediaPlayerState.PLAYING and now is not None:
+            self._attr_extra_state_attributes = {
+                ATTR_MEDIA_DESCRIPTION: now.title,
+                ATTR_MEDIA_START_TIME: now.start,
+                ATTR_MEDIA_END_TIME: now.end,
+            }
+        else:
+            self._attr_extra_state_attributes = {}
+
+    async def async_turn_off(self) -> None:
         """Turn off media player."""
-        self._dreambox.standby = True
+        await self._async_command(self._set_standby, True)
 
-    def turn_on(self):
+    async def async_turn_on(self) -> None:
         """Turn the media player on."""
-        self._dreambox.standby = False
+        await self._async_command(self._set_standby, False)
 
-    @property
-    def media_image_url(self) -> Optional[str]:
-        return self._dreambox.picon()
+    def _set_standby(self, standby: bool) -> None:
+        self.coordinator.api.standby = standby
 
-    def set_volume_level(self, volume) -> None:
+    async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1."""
-        self._dreambox.volume = int(volume * 100)
+        await self._async_command(self._set_volume, volume)
 
-    def volume_up(self) -> None:
+    def _set_volume(self, volume: float) -> None:
+        self.coordinator.api.volume = int(volume * 100)
+
+    async def async_volume_up(self) -> None:
         """Volume up the media player."""
-        self._dreambox.volumeUp()
+        await self._async_command(self.coordinator.api.volumeUp)
 
-    def volume_down(self) -> None:
+    async def async_volume_down(self) -> None:
         """Volume down media player."""
-        self._dreambox.volumeDown()
+        await self._async_command(self.coordinator.api.volumeDown)
 
-    def _send_remote(self, result) -> None:
-        if not result or not getattr(result, "state", False):
-            raise MediaPlayerException("Failed to send remote control command")
+    async def async_mute_volume(self, mute: bool) -> None:
+        """Mute or unmute."""
+        await self._async_command(self._set_muted, mute)
 
-    def media_stop(self) -> None:
+    def _set_muted(self, muted: bool) -> None:
+        self.coordinator.api.muted = muted
+
+    async def async_media_stop(self) -> None:
         """Send stop command."""
-        self._send_remote(self._dreambox.stop())
+        await self._async_remote(self.coordinator.api.stop)
 
     @property
     def _play_pause_toggle(self) -> bool:
@@ -146,39 +194,60 @@ class DreamboxDevice(MediaPlayerEntity):
             CONF_PLAY_PAUSE_TOGGLE, DEFAULT_PLAY_PAUSE_TOGGLE
         )
 
-    def media_play_pause(self) -> None:
-        self._send_remote(self._dreambox.togglePlayPause())
+    async def async_media_play_pause(self) -> None:
+        """Send play/pause toggle command."""
+        await self._async_remote(self.coordinator.api.togglePlayPause)
 
-    def media_play(self) -> None:
+    async def async_media_play(self) -> None:
         """Play media."""
         if self._play_pause_toggle:
-            self._send_remote(self._dreambox.togglePlayPause())
+            await self._async_remote(self.coordinator.api.togglePlayPause)
         else:
-            self._send_remote(self._dreambox.play())
+            await self._async_remote(self.coordinator.api.play)
 
-    def media_pause(self) -> None:
+    async def async_media_pause(self) -> None:
         """Pause the media player."""
         if self._play_pause_toggle:
-            self._send_remote(self._dreambox.togglePlayPause())
+            await self._async_remote(self.coordinator.api.togglePlayPause)
         else:
-            self._send_remote(self._dreambox.pause())
+            await self._async_remote(self.coordinator.api.pause)
 
-    def media_next_track(self) -> None:
+    async def async_media_next_track(self) -> None:
         """Send next track command."""
-        self._send_remote(self._dreambox.set_channel_up())
+        await self._async_remote(self.coordinator.api.set_channel_up)
 
-    def media_previous_track(self) -> None:
+    async def async_media_previous_track(self) -> None:
         """Send previous track command."""
-        self._send_remote(self._dreambox.set_channel_down())
+        await self._async_remote(self.coordinator.api.set_channel_down)
 
-    def mute_volume(self, mute) -> None:
-        """Mute or unmute."""
-        self._dreambox.muted = mute
+    async def _async_command(self, target: Callable[..., Any], *args: Any) -> None:
+        """Run a command in the executor and refresh the coordinator."""
+        try:
+            await self.hass.async_add_executor_job(target, *args)
+        except DreamboxError as err:
+            raise HomeAssistantError(str(err)) from err
+        await self.coordinator.async_request_refresh()
 
-    def _browse_media_library(
-        self, media_content_type, media_content_id
-    ) -> "BrowseMedia":
-        self._bouquet = None
+    def _check_remote(self, result: Any) -> None:
+        if not result or not getattr(result, "state", False):
+            raise MediaPlayerException("Failed to send remote control command")
+
+    async def _async_remote(self, target: Callable[[], Any]) -> None:
+        """Run a remote-control command and refresh the coordinator."""
+        try:
+            result = await self.hass.async_add_executor_job(target)
+        except DreamboxError as err:
+            raise HomeAssistantError(str(err)) from err
+        self._check_remote(result)
+        await self.coordinator.async_request_refresh()
+
+    async def _async_bouquets(self) -> list[ServiceList]:
+        try:
+            return await self.coordinator.async_get_bouquets()
+        except HomeAssistantError as err:
+            raise BrowseError(str(err)) from err
+
+    def _browse_media_library(self, bouquets: list[ServiceList]) -> BrowseMedia:
         library_info = {
             "title": "Favorites",
             "media_class": MediaClass.DIRECTORY,
@@ -190,7 +259,7 @@ class DreamboxDevice(MediaPlayerEntity):
             "children": [],
         }
 
-        for bouquet in self._dreambox.bouquets:
+        for bouquet in bouquets:
             bouquet_info = {
                 "title": bouquet.name,
                 "media_class": MediaClass.PLAYLIST,
@@ -205,15 +274,16 @@ class DreamboxDevice(MediaPlayerEntity):
         return BrowseMedia(**library_info)
 
     def _browse_media_bouquet(
-        self, media_content_type, media_content_id
-    ) -> "BrowseMedia":
+        self, bouquets: list[ServiceList], media_content_id: str | None
+    ) -> BrowseMedia | None:
         bouquet = None
-        for b in self._dreambox.bouquets:
-            if b.ref == media_content_id:
-                bouquet = b
-        if not bouquet:
+        for candidate in bouquets:
+            if candidate.ref == media_content_id:
+                bouquet = candidate
+                break
+        if bouquet is None:
             return None
-        self._bouquet = bouquet
+
         bouquet_info = {
             "title": bouquet.name,
             "media_class": MediaClass.PLAYLIST,
@@ -231,74 +301,36 @@ class DreamboxDevice(MediaPlayerEntity):
                 "media_content_id": service.ref,
                 "media_content_type": MediaType.TVSHOW,
                 "can_play": True,
-                "thumbnail": self._dreambox.picon(service),
+                "thumbnail": self.coordinator.api.picon(service),
                 "can_expand": False,
             }
             bouquet_info["children"].append(BrowseMedia(**service_info))
-        response = BrowseMedia(**bouquet_info)
-        return response
+        return BrowseMedia(**bouquet_info)
 
     async def async_browse_media(
-        self, media_content_type: Optional[str], media_content_id: Optional[str]
-    ) -> "BrowseMedia":
-        builder = None
-        if media_content_type in [None, "library"]:
-            builder = self._browse_media_library
-        elif media_content_type == "bouquet":
-            builder = self._browse_media_bouquet
-        response = None
-        if builder:
-            response = await self.hass.async_add_executor_job(
-                builder, media_content_type, media_content_id
+        self, media_content_type: str | None, media_content_id: str | None
+    ) -> BrowseMedia:
+        """Browse the Dreambox bouquets and their services."""
+        if media_content_type in (None, "library"):
+            return self._browse_media_library(await self._async_bouquets())
+        if media_content_type == "bouquet":
+            response = self._browse_media_bouquet(
+                await self._async_bouquets(), media_content_id
             )
-        if response is None:
-            raise BrowseError(
-                f"Media not found: {media_content_type} / {media_content_id}"
-            )
-        return response
+            if response is not None:
+                return response
+        raise BrowseError(f"Media not found: {media_content_type} / {media_content_id}")
 
-    def play_media(self, media_type: str, media_id: str, **kwargs) -> None:
-        if media_type != MediaType.TVSHOW or not self._bouquet:
+    async def async_play_media(
+        self, media_type: str, media_id: str, **kwargs: Any
+    ) -> None:
+        """Play a channel from the browsed bouquets."""
+        if media_type != MediaType.TVSHOW:
             raise MediaPlayerException(
                 f"Media not supported: {media_type} / {media_id}"
             )
-        for service in self._bouquet.services:
-            if service.ref == media_id:
-                self._dreambox.playService(service, self._bouquet)
-                return
-        raise MediaPlayerException(f"Channel not found: {media_type} / {media_id}")
-
-    def update(self) -> None:
-        """Update state of the media_player."""
-        self._dreambox.update()
-
-        if self._dreambox.standby:
-            self._attr_state = MediaPlayerState.OFF
-        elif self._dreambox.current:
-            self._attr_state = MediaPlayerState.PLAYING
-        else:
-            self._attr_state = MediaPlayerState.ON
-
-        self._attr_assumed_state = self._attr_state != MediaPlayerState.OFF
-        self._attr_available = self._dreambox.available
-        self._attr_media_title = self._dreambox.current.name
-        self._attr_media_series_title = self._dreambox.current.now.title
-        self._attr_media_channel = self._dreambox.current.name
-        self._attr_media_content_id = self._dreambox.current.ref
-        self._attr_media_duration = self._dreambox.current.now.duration or None
-        self._attr_is_volume_muted = self._dreambox.muted
-        self._attr_volume_level = float(self._dreambox.volume) / 100.0
-
-        if self._dreambox.bouquet:
-            self._attr_media_playlist = self._dreambox.bouquet.name
-        else:
-            self._attr_media_playlist = None
-
-        if self._attr_state == MediaPlayerState.PLAYING:
-            self._attr_extra_state_attributes = {
-                ATTR_MEDIA_DESCRIPTION: self._dreambox.current.now.title,
-                ATTR_MEDIA_START_TIME: self._dreambox.current.now.start,
-                ATTR_MEDIA_END_TIME: self._dreambox.current.now.end,
-            }
-        else:
-            self._attr_extra_state_attributes = {}
+        try:
+            await self.coordinator.async_play_service(media_id)
+        except HomeAssistantError as err:
+            raise MediaPlayerException(str(err)) from err
+        await self.coordinator.async_request_refresh()

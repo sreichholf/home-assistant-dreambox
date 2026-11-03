@@ -26,11 +26,20 @@
               "password": "Password",
               "path": "Picon Path"
             }
+          },
+        "reauth_confirm": {
+          "title": "Reauthenticate Dreambox",
+          "description": "Update the credentials for {name}.",
+          "data": {
+            "username": "Username",
+            "password": "Password"
           }
+        }
       },
       "abort": {
         "already_configured": "This dreambox has already been configured!",
-        "no_devices_found": "No devices found!"
+        "no_devices_found": "No devices found!",
+        "unique_id_mismatch": "This is a different Dreambox."
       },
       "error": {
           "invalid_auth": "Authentication failed!",
