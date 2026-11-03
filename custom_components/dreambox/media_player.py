@@ -98,9 +98,10 @@ class DreamboxDevice(CoordinatorEntity[DreamboxCoordinator], MediaPlayerEntity):
         self._attr_assumed_state = True
         self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
         self._attr_device_info = coordinator.device_info
+        self._attr_has_entity_name = True
         self._attr_icon = "mdi:set-top-box"
         self._attr_media_content_type = MediaType.TVSHOW
-        self._attr_name = config_entry.data.get(CONF_NAME, config_entry.title)
+        self._attr_name = None
         self._attr_supported_features = SUPPORTED_DREAMBOX
         self._attr_unique_id = coordinator.unique_id
         self._update_attrs()
@@ -301,11 +302,41 @@ class DreamboxDevice(CoordinatorEntity[DreamboxCoordinator], MediaPlayerEntity):
                 "media_content_id": service.ref,
                 "media_content_type": MediaType.TVSHOW,
                 "can_play": True,
-                "thumbnail": self.coordinator.api.picon(service),
+                "thumbnail": self.get_browse_image_url(MediaType.TVSHOW, service.ref),
                 "can_expand": False,
             }
             bouquet_info["children"].append(BrowseMedia(**service_info))
         return BrowseMedia(**bouquet_info)
+
+    async def async_get_media_image(self) -> tuple[bytes | None, str | None]:
+        """Return the current channel icon with webinterface authentication."""
+        current = self.coordinator.data.current
+        if current is None:
+            return (None, None)
+        try:
+            return await self.hass.async_add_executor_job(
+                self.coordinator.api.get_picon, current
+            )
+        except DreamboxError:
+            return (None, None)
+
+    async def async_get_browse_image(
+        self,
+        media_content_type: str,
+        media_content_id: str,
+        media_image_id: str | None = None,
+    ) -> tuple[bytes | None, str | None]:
+        """Return a browse thumbnail with webinterface authentication."""
+        found = self.coordinator.find_service(media_content_id)
+        if found is None:
+            return (None, None)
+        service, _bouquet = found
+        try:
+            return await self.hass.async_add_executor_job(
+                self.coordinator.api.get_picon, service
+            )
+        except DreamboxError:
+            return (None, None)
 
     async def async_browse_media(
         self, media_content_type: str | None, media_content_id: str | None

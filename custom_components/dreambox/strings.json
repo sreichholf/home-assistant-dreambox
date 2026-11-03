@@ -47,7 +47,7 @@
   },
   "options": {
     "step": {
-      "dreambox": {
+      "init": {
         "title": "Dreambox options",
         "data": {
           "path": "Picon path",

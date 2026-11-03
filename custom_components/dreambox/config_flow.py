@@ -60,7 +60,7 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get options flow for this handler."""
-        return DreamboxOptionsFlowHandler(config_entry)
+        return DreamboxOptionsFlowHandler()
 
     def __init__(self):
         self._host = None
@@ -274,26 +274,19 @@ class DreamboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-class DreamboxOptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry):
-        self._config_entry = config_entry
-        self.options = dict(config_entry.options)
-
+class DreamboxOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     async def async_step_init(self, user_input=None):
-        return await self.async_step_dreambox(user_input)
-
-    async def async_step_dreambox(self, user_input=None):
         if user_input is not None:
-            self.options.update(user_input)
-            return self.async_create_entry(title="", data=self.options)
-        options = self._config_entry.options
+            return self.async_create_entry(data=user_input)
+
+        options = self.config_entry.options
         piconpath = options.get(CONF_PATH, DEFAULT_PICON_PATH)
         play_pause_toggle = options.get(
             CONF_PLAY_PAUSE_TOGGLE, DEFAULT_PLAY_PAUSE_TOGGLE
         )
 
         return self.async_show_form(
-            step_id="dreambox",
+            step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_PATH, default=piconpath): cv.string,
