@@ -1,8 +1,6 @@
 """The Dreambox integration."""
-import asyncio
 
 from dreamboxapi.api import DreamboxApi
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_DEVICES,
     CONF_HOST,
@@ -13,14 +11,13 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 
-from .const import CONF_CONNECTIONS, DEFAULT_PICON_PATH, DOMAIN, PLATFORMS
+from .const import DEFAULT_PICON_PATH, DOMAIN, PLATFORMS
+from .coordinator import DreamboxConfigEntry, DreamboxCoordinator
 
 
-async def async_setup(hass: HomeAssistant, config: dict):
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Dreambox component."""
-    hass.data.setdefault(DOMAIN, {CONF_CONNECTIONS: {}, CONF_DEVICES: set()})
     if DOMAIN in config:
         for entry_config in config[DOMAIN][CONF_DEVICES]:
             hass.async_create_task(
@@ -31,29 +28,28 @@ async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: DreamboxConfigEntry) -> bool:
     """Set up Dreambox from a config entry."""
     _async_import_options_from_data_if_missing(hass, entry)
-    host = entry.data[CONF_HOST]
-    port = entry.data[CONF_PORT]
-    username = entry.data[CONF_USERNAME]
-    password = entry.data[CONF_PASSWORD]
-    piconpath = entry.options[CONF_PATH]
-    ssl = entry.data[CONF_SSL]
-    api = DreamboxApi(
-        host=host,
-        port=port,
-        user=username,
-        password=password,
-        https=ssl,
-        piconpath=piconpath,
-    )
-    await hass.async_add_executor_job(api.get_deviceinfo)
-    if api.deviceinfo is None:
-        raise ConfigEntryNotReady("Failed to obtain device information")
 
-    hass.data[DOMAIN][CONF_CONNECTIONS][entry.entry_id] = api
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    api = DreamboxApi(
+        host=entry.data[CONF_HOST],
+        port=entry.data[CONF_PORT],
+        user=entry.data[CONF_USERNAME],
+        password=entry.data[CONF_PASSWORD],
+        https=entry.data[CONF_SSL],
+        piconpath=entry.options[CONF_PATH],
+    )
+    coordinator = DreamboxCoordinator(hass, entry, api)
+    setup_ok = False
+    try:
+        await coordinator.async_config_entry_first_refresh()
+        entry.runtime_data = coordinator
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        setup_ok = True
+    finally:
+        if not setup_ok:
+            await coordinator.async_shutdown()
 
     return True
 
@@ -66,10 +62,9 @@ def _async_import_options_from_data_if_missing(hass, entry):
         hass.config_entries.async_update_entry(entry, options=options)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: DreamboxConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN][CONF_CONNECTIONS].pop(entry.entry_id)
-
+        await entry.runtime_data.async_shutdown()
     return unload_ok

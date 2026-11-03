@@ -25,11 +25,20 @@
           "password": "[%key:common::config_flow::data::password%]",
           "path": "[%key:common::config_flow::data::usb_path%]"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Dreambox",
+        "description": "Update the credentials for {name}.",
+        "data": {
+          "username": "[%key:common::config_flow::data::username%]",
+          "password": "[%key:common::config_flow::data::password%]"
+        }
       }
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]"
+      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]",
+      "unique_id_mismatch": "This is a different Dreambox."
     },
     "error": {
         "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
@@ -38,8 +47,16 @@
   },
   "options": {
     "step": {
-      "dreambox": {
-        "title": "Directories"
+      "init": {
+        "title": "Dreambox options",
+        "data": {
+          "path": "Picon path",
+          "play_pause_toggle": "Use play/pause toggle for Pause"
+        },
+        "data_description": {
+          "path": "Path on the Dreambox where the picon files are stored.",
+          "play_pause_toggle": "Enable when Pause does nothing on your Dreambox. Play and Pause will both send the remote play/pause key."
+        }
       }
     }
   }

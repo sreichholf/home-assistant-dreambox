@@ -26,11 +26,20 @@
               "password": "Password",
               "path": "Picon Path"
             }
+          },
+        "reauth_confirm": {
+          "title": "Reauthenticate Dreambox",
+          "description": "Update the credentials for {name}.",
+          "data": {
+            "username": "Username",
+            "password": "Password"
           }
+        }
       },
       "abort": {
         "already_configured": "This dreambox has already been configured!",
-        "no_devices_found": "No devices found!"
+        "no_devices_found": "No devices found!",
+        "unique_id_mismatch": "This is a different Dreambox."
       },
       "error": {
           "invalid_auth": "Authentication failed!",
@@ -39,8 +48,16 @@
     },
     "options": {
       "step": {
-        "dreambox": {
-          "description": "Directories"
+        "init": {
+          "title": "Dreambox options",
+          "data": {
+            "path": "Picon path",
+            "play_pause_toggle": "Use play/pause toggle for Pause"
+          },
+          "data_description": {
+            "path": "Path on the Dreambox where the picon files are stored.",
+            "play_pause_toggle": "Enable when Pause does nothing on your Dreambox. Play and Pause will both send the remote play/pause key."
+          }
         }
       }
     }
